@@ -1,0 +1,9 @@
+{
+    "name": "dotest",
+    "version": "0.1.0",
+    "description": "Opinionated and intuitive testing framework, leveraging typescripts abilities for manageable code.",
+    "license": "ISC",
+    "author": "Dotan Krispin",
+    "type": "module",
+    "main": "index.ts"
+}
