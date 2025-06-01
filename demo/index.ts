@@ -9,6 +9,10 @@ test("Dotest Framework", () => {
         expect(true).toBe(true);
     });
 
+    test("Waits", async () => {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+    });
+
     test("Fails", () => {
         expect(false).toBe(true);
     });

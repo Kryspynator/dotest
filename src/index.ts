@@ -41,7 +41,10 @@ class Dotest {
         this.currentSuite = this.rootSuite;
     }
 
-    createSuite(name: string, parent: Suite<any, any> | null): Suite<any, any> {
+    private createSuite(
+        name: string,
+        parent: Suite<any, any> | null
+    ): Suite<any, any> {
         return {
             name,
             parent,
@@ -218,7 +221,7 @@ class Dotest {
         print("\n✅ Test execution complete");
     }
 
-    async executeSuite(suite: Suite, depth: number) {
+    private async executeSuite<BA, BE>(suite: Suite<BA, BE>, depth: number) {
         const indent = indentString.repeat(Math.max(0, depth));
 
         if (depth >= 0) {
@@ -228,7 +231,7 @@ class Dotest {
         const data = await suite.beforeAll();
 
         for (const test of suite.tests) {
-            await this.executeTestWithHooks(test, suite, depth + 1);
+            await this.executeTestWithHooks(test, suite, depth + 1, data);
         }
 
         for (const child of suite.children) {
@@ -238,47 +241,44 @@ class Dotest {
         await suite.afterAll(data);
     }
 
-    async executeTestWithHooks(test: TestFunc, suite: Suite, depth: number) {
+    private async executeTestWithHooks<BA, BE>(
+        test: Test<BA, BE>,
+        suite: Suite<BA, BE>,
+        depth: number,
+        beforeAllData: BA
+    ) {
         const indent = indentString.repeat(depth);
         print(`${indent}🔍 ${test.name}`);
 
-        const beforeEach = this.collectHookFromRoot(suite, "beforeEach");
-        const afterEach = this.collectHookFromRoot(suite, "afterEach");
+        const beforeEach: BeforeFunc<BE> = this.collectHookFromRoot(
+            suite,
+            "beforeEach"
+        );
+        const afterEach: AfterFunc<BE> = this.collectHookFromRoot(
+            suite,
+            "afterEach"
+        );
 
-        let data = {};
+        let data: BE | null = null;
 
         try {
-            data = beforeEach();
+            const indent = indentString.repeat(depth + 1);
+            data = await beforeEach();
             try {
                 try {
-                    await test.fn(data);
+                    await test.fn(beforeAllData, data);
 
-                    print(`${indent}${indentString}✅ Passed`);
+                    print(`${indent}✅ Passed`);
                 } catch (error: any) {
-                    print(
-                        `${indent}${indentString}❌ Failed: ${error.message}`
-                    );
+                    print(`${indent}❌ Failed: ${error.message}`);
                 } finally {
                     afterEach(data);
                 }
             } catch (error: any) {
-                print(
-                    `${indent}${indentString}❌ Failed In AfterEach: ${error.message}`
-                );
+                print(`${indent}❌ Failed In AfterEach: ${error.message}`);
             }
         } catch (error: any) {
-            console.log(
-                `${indent}${indentString}❌ Failed In BeforeEach: ${error.message}`
-            );
-        }
-    }
-
-    async executeTest<BA, BE>(test: Test<BA, BE>) {
-        try {
-            await test.fn();
-            return { passed: true };
-        } catch (error: any) {
-            return { passed: false, error: error.message };
+            console.log(`${indent}❌ Failed In BeforeEach: ${error.message}`);
         }
     }
 
