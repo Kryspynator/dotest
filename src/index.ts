@@ -1,12 +1,31 @@
-interface Suite {
+type OptionallyAsync<T> = T | Promise<T>;
+
+type BeforeFunc<Data> = () => OptionallyAsync<Data>;
+
+type AfterFunc<Data> = (data: Data) => OptionallyAsync<void>;
+
+type TestFunc<BeforeAllData, BeforeEachData> = (
+    beforeAllData: BeforeAllData,
+    beforeEachData: BeforeEachData
+) => OptionallyAsync<BeforeAllData & BeforeEachData> | OptionallyAsync<void>;
+
+type TestCaseFunc<BeforeAllData, BeforeEachData, TestCaseData> = (
+    beforeAllData: BeforeAllData,
+    beforeEachData: BeforeEachData,
+    testCaseData: TestCaseData
+) => OptionallyAsync<BeforeAllData & BeforeEachData> | OptionallyAsync<void>;
+
+type Test<BA, BE> = { name: string; fn: TestFunc<BA, BE> };
+
+interface Suite<BA, BE> {
     name: string;
-    parent: Suite | null;
-    children: Suite[];
-    tests: { name: string; fn: Function }[];
-    beforeAll: Function;
-    afterAll: Function;
-    beforeEach: Function;
-    afterEach: Function;
+    parent: Suite<any, any> | null;
+    children: Suite<any, any>[];
+    tests: Test<BA, BE>[];
+    beforeAll: BeforeFunc<BA>;
+    afterAll: AfterFunc<BA>;
+    beforeEach: BeforeFunc<BE>;
+    afterEach: AfterFunc<BE>;
 }
 
 const print = console.log;
@@ -14,15 +33,15 @@ const print = console.log;
 const indentString = "   ";
 
 class Dotest {
-    rootSuite: Suite;
-    currentSuite: Suite;
+    rootSuite: Suite<any, any>;
+    currentSuite: Suite<any, any>;
 
     constructor() {
         this.rootSuite = this.createSuite("root", null);
         this.currentSuite = this.rootSuite;
     }
 
-    createSuite(name, parent): Suite {
+    createSuite(name: string, parent: Suite<any, any> | null): Suite<any, any> {
         return {
             name,
             parent,
@@ -35,7 +54,7 @@ class Dotest {
         };
     }
 
-    test(name, fn) {
+    test<BA, BE>(name: string, fn: TestFunc<BA, BE>) {
         const hasNestedTests = this.detectNestedTests(fn);
 
         if (hasNestedTests) {
@@ -55,7 +74,11 @@ class Dotest {
         }
     }
 
-    testEach(name, testCases, fn) {
+    testEach<BA, BE, TC>(
+        name: string,
+        testCases: TC[],
+        fn: TestCaseFunc<BA, BE, TC>
+    ) {
         if (!Array.isArray(testCases) || testCases.length === 0) {
             throw new Error(
                 "test.each requires a non-empty array of test cases"
@@ -69,12 +92,13 @@ class Dotest {
             const testName = `${name} - ${JSON.stringify(testCase)}`;
             suite.tests.push({
                 name: testName,
-                fn: () => fn({ testCase }),
+                fn: (beforeAll: BA, beforeEach: BE) =>
+                    fn(beforeAll, beforeEach, testCase),
             });
         }
     }
 
-    detectNestedTests(fn) {
+    detectNestedTests<BA, BE>(fn: TestFunc<BA, BE>): boolean {
         let hasNested = false;
         const originalTest = this.test.bind(this);
 
@@ -93,30 +117,30 @@ class Dotest {
         return hasNested;
     }
 
-    beforeAll(fn) {
+    beforeAll<Data>(fn: BeforeFunc<Data>) {
         this.currentSuite.beforeAll = fn;
     }
 
-    afterAll(fn) {
+    afterAll<Data>(fn: AfterFunc<Data>) {
         this.currentSuite.afterAll = fn;
     }
 
-    beforeEach(fn) {
+    beforeEach<Data>(fn: BeforeFunc<Data>) {
         this.currentSuite.beforeEach = fn;
     }
 
-    afterEach(fn) {
+    afterEach<Data>(fn: AfterFunc<Data>) {
         this.currentSuite.afterEach = fn;
     }
 
-    expect(actual: unknown) {
+    expect<T>(actual: T) {
         const assertions = {
-            toBe(expected) {
+            toBe(expected: T) {
                 if (!Object.is(actual, expected)) {
                     throw new Error(`Expected ${actual} to be ${expected}`);
                 }
             },
-            toEqual(expected) {
+            toEqual(expected: T) {
                 if (JSON.stringify(actual) !== JSON.stringify(expected)) {
                     throw new Error(
                         `Expected ${JSON.stringify(
@@ -147,21 +171,21 @@ class Dotest {
                     );
                 }
             },
-            toBeInstanceOf(expected) {
+            toBeInstanceOf(expected: any) {
                 if (!(actual instanceof expected)) {
                     throw new Error(
                         `Expected ${actual} to be an instance of ${expected}`
                     );
                 }
             },
-            toThrow(data) {
+            toThrow(data?: any) {
                 if (typeof actual !== "function") {
                     throw new Error(
                         "Expected value must be a function when using toThrow"
                     );
                 }
                 try {
-                    actual(data);
+                    actual(...data);
                     throw new Error(
                         "Expected function to throw, but it did not"
                     );
@@ -214,7 +238,7 @@ class Dotest {
         await suite.afterAll(data);
     }
 
-    async executeTestWithHooks(test, suite, depth) {
+    async executeTestWithHooks(test: TestFunc, suite: Suite, depth: number) {
         const indent = indentString.repeat(depth);
         print(`${indent}🔍 ${test.name}`);
 
@@ -230,30 +254,30 @@ class Dotest {
                     await test.fn(data);
 
                     print(`${indent}${indentString}✅ Passed`);
-                } catch (error) {
+                } catch (error: any) {
                     print(
                         `${indent}${indentString}❌ Failed: ${error.message}`
                     );
                 } finally {
                     afterEach(data);
                 }
-            } catch (error) {
+            } catch (error: any) {
                 print(
                     `${indent}${indentString}❌ Failed In AfterEach: ${error.message}`
                 );
             }
-        } catch (error) {
+        } catch (error: any) {
             console.log(
                 `${indent}${indentString}❌ Failed In BeforeEach: ${error.message}`
             );
         }
     }
 
-    async executeTest(test) {
+    async executeTest<BA, BE>(test: Test<BA, BE>) {
         try {
             await test.fn();
             return { passed: true };
-        } catch (error) {
+        } catch (error: any) {
             return { passed: false, error: error.message };
         }
     }
@@ -276,19 +300,29 @@ const dotest = new Dotest();
 
 // Exports
 export const before = {
-    all: (fn) => dotest.beforeAll(fn),
-    each: (fn) => dotest.beforeEach(fn),
+    all: <Data>(fn: BeforeFunc<Data>) => dotest.beforeAll(fn),
+    each: <Data>(fn: BeforeFunc<Data>) => dotest.beforeEach(fn),
 };
 
 export const after = {
-    all: (fn) => dotest.afterAll(fn),
-    each: (fn) => dotest.afterEach(fn),
+    all: <Data>(fn: AfterFunc<Data>) => dotest.afterAll(fn),
+    each: <Data>(fn: AfterFunc<Data>) => dotest.afterEach(fn),
 };
 
-export const test = Object.assign((name, fn) => dotest.test(name, fn), {
-    each: (name, testCases, fn) => dotest.testEach(name, testCases, fn),
-});
+export const test = Object.assign(
+    <BeforeAllData, BeforeEachData>(
+        name: string,
+        fn: TestFunc<BeforeAllData, BeforeEachData>
+    ) => dotest.test(name, fn),
+    {
+        each: <BeforeAllData, BeforeEachData, TestCaseData>(
+            name: string,
+            testCases: TestCaseData[],
+            fn: TestCaseFunc<BeforeAllData, BeforeEachData, TestCaseData>
+        ) => dotest.testEach(name, testCases, fn),
+    }
+);
 
-export const expect = (actual) => dotest.expect(actual);
+export const expect = <T>(actual: T) => dotest.expect(actual);
 
 export const run = () => dotest.run();

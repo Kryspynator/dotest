@@ -1,4 +1,4 @@
-import { test, run, expect, before, after } from "./index.ts";
+import { test, run, expect, before, after } from "../src/index.ts";
 
 test("Dotest Framework", () => {
     before.all(() => {
@@ -11,6 +11,10 @@ test("Dotest Framework", () => {
 
     test("Fails", () => {
         expect(false).toBe(true);
+    });
+
+    test.each("Passes And Fails", [true, false], (_ba, _be, data) => {
+        expect(true).toBe(data);
     });
 
     test("Throws", () => {
