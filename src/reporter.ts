@@ -14,7 +14,7 @@ const printGreen = (message: string) => {
     print(green(message));
 };
 
-export const reporter: Reporter = {
+export const defaultReporter: Reporter = {
     failedTest: (error: Error, depth: number) => {
         const indent = indentString.repeat(depth);
         printRed(`${indent}❌ Failed: ${error.message}`);
@@ -23,7 +23,7 @@ export const reporter: Reporter = {
         const indent = indentString.repeat(depth);
         printGreen(`${indent}✅ Passed - ${elapsed}ms`);
     },
-    startedSpec: (name: string, depth: number) => {
+    startedSuite: (name: string, depth: number) => {
         const indent = indentString.repeat(depth);
         print(`${indent}📁 ${name}`);
     },
@@ -31,7 +31,30 @@ export const reporter: Reporter = {
         const indent = indentString.repeat(depth);
         print(`${indent}🔍 ${name}`);
     },
-    info: (message: string) => {
-        print(`${message}`);
+    startedAll: () => {
+        print("🧪 Running tests...\n");
+    },
+    finishedSuite: (
+        name: string,
+        depth: number,
+        failed: number,
+        passed: number
+    ) => {
+        if (depth < 0) return;
+        const indent = indentString.repeat(depth);
+        if (failed === 0) return;
+        printRed(`${indent}❌ Failed: ${failed}`);
+    },
+    finishedAll: (failed: number, passed: number) => {
+        print("\n🧪 Test run complete.");
+        printGreen(`✅ Passed: ${passed}`);
+        printRed(`❌ Failed: ${failed}`);
+        if (failed > 0) {
+            printRed(
+                "Some tests failed. Please check the output above for details."
+            );
+        } else {
+            printGreen("All tests passed successfully!");
+        }
     },
 };

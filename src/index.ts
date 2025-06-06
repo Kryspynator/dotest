@@ -10,7 +10,7 @@ import { Dotest } from "./framework.ts";
 const dotest = new Dotest();
 
 // Exports
-export type { Config } from "./types.ts";
+export type { Config, Reporter } from "./types.ts";
 
 export const before = {
     all: <Data>(fn: BeforeFunc<Data>) => dotest.beforeAll(fn),

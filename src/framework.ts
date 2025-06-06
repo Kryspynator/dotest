@@ -1,5 +1,5 @@
 import { Timer } from "timer-node";
-import { reporter } from "./reporter.ts";
+import { defaultReporter } from "./reporter.ts";
 import type {
     AfterFunc,
     BeforeFunc,
@@ -13,7 +13,7 @@ import type {
 export class Dotest {
     rootSuite: Suite<any, any>;
     currentSuite: Suite<any, any>;
-    reporter: Reporter = reporter;
+    reporter: Reporter = defaultReporter;
     testTimeout: number = 5000;
 
     constructor() {
@@ -36,6 +36,8 @@ export class Dotest {
                 beforeEach: () => {},
                 afterEach: () => {},
             },
+            failed: 0,
+            passed: 0,
         };
     }
 
@@ -72,15 +74,16 @@ export class Dotest {
 
         const suite = this.createSuite(name, this.currentSuite);
         this.currentSuite.children.push(suite);
+        this.currentSuite = suite;
 
         for (const testCase of testCases) {
-            const testName = `${name} - ${JSON.stringify(testCase)}`;
-            suite.tests.push({
-                name: testName,
-                fn: (beforeAll: BA, beforeEach: BE) =>
-                    fn(beforeAll, beforeEach, testCase),
-            });
+            this.test(
+                `${name} - ${JSON.stringify(testCase)}`,
+                (beforeAll: BA, beforeEach: BE) =>
+                    fn(beforeAll, beforeEach, testCase)
+            );
         }
+        this.currentSuite = this.currentSuite.parent || this.rootSuite;
     }
 
     detectNestedTests<BA, BE>(fn: TestFunc<BA, BE>): boolean {
@@ -199,22 +202,20 @@ export class Dotest {
         this.reporter = reporter;
         this.testTimeout = testTimeout;
 
-        reporter.info("🧪 Running tests...\n");
-
+        this.reporter.startedAll();
         await this.executeSuite(this.rootSuite, -1);
-
-        reporter.info("\n✅ Test execution complete");
+        this.reporter.finishedAll(this.rootSuite.failed, this.rootSuite.passed);
     }
 
     private async executeSuite<BA, BE>(suite: Suite<BA, BE>, depth: number) {
         if (depth >= 0) {
-            this.reporter.startedSpec(suite.name, depth);
+            this.reporter.startedSuite(suite.name, depth);
         }
 
         const data = await suite.hooks.beforeAll();
 
         for (const test of suite.tests) {
-            await this.executeTestWithHooks(test, suite, depth + 1, data);
+            await this.executeTest(test, suite, depth + 1, data);
         }
 
         for (const child of suite.children) {
@@ -222,9 +223,15 @@ export class Dotest {
         }
 
         await suite.hooks.afterAll(data);
+        this.reporter.finishedSuite(
+            suite.name,
+            depth,
+            suite.failed,
+            suite.passed
+        );
     }
 
-    private async executeTestWithHooks<BA, BE>(
+    private async executeTest<BA, BE>(
         test: Test<BA, BE>,
         suite: Suite<BA, BE>,
         depth: number,
@@ -262,6 +269,8 @@ export class Dotest {
 
                         timer.stop();
                         const elapsed = timer.ms();
+                        suite.passed++;
+                        this.rootSuite.passed++;
                         this.reporter.passedTest(elapsed, depth + 1);
                     } catch (error: any) {
                         clearTimeout(timeoutId);
@@ -285,6 +294,8 @@ export class Dotest {
                 throw error;
             }
         } catch (error: any) {
+            suite.failed++;
+            this.rootSuite.failed++;
             this.reporter.failedTest(error, depth + 1);
         }
     }

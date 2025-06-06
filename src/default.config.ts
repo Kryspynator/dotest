@@ -1,4 +1,4 @@
-import { reporter } from "./reporter.ts";
+import { defaultReporter } from "./reporter.ts";
 import type { StrictConfig } from "./types.ts";
 
 const config: StrictConfig = {
@@ -6,7 +6,7 @@ const config: StrictConfig = {
     testNamePattern: "\\.spec\\.ts$",
     includeDirectories: [],
     excludeDirectories: ["node_modules", "dist", "build", "coverage", ".git"],
-    reporter: reporter,
+    reporter: defaultReporter,
 };
 
 export default config;

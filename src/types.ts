@@ -5,9 +5,16 @@ export type Prettify<T> = {
 export interface Reporter {
     failedTest: (error: Error, depth: number) => void;
     passedTest: (elapsed: number, depth: number) => void;
-    startedSpec: (name: string, depth: number) => void;
+    startedSuite: (name: string, depth: number) => void;
     startedTest: (name: string, depth: number) => void;
-    info: (message: string) => void;
+    startedAll: () => void;
+    finishedSuite: (
+        name: string,
+        depth: number,
+        failed: number,
+        passed: number
+    ) => void;
+    finishedAll: (failed: number, passed: number) => void;
 }
 
 export interface RunArgs {
@@ -81,4 +88,6 @@ export interface Suite<BA, BE> {
     children: Suite<any, any>[];
     tests: Test<BA, BE>[];
     hooks: Hooks<BA, BE>;
+    failed: number;
+    passed: number;
 }
