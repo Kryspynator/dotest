@@ -19,9 +19,9 @@ export const reporter: Reporter = {
         const indent = indentString.repeat(depth);
         printRed(`${indent}❌ Failed: ${error.message}`);
     },
-    passedTest: (depth: number) => {
+    passedTest: (elapsed: number, depth: number) => {
         const indent = indentString.repeat(depth);
-        printGreen(`${indent}✅ Passed`);
+        printGreen(`${indent}✅ Passed - ${elapsed}ms`);
     },
     startedSpec: (name: string, depth: number) => {
         const indent = indentString.repeat(depth);

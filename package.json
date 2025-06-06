@@ -8,7 +8,8 @@
     "main": "src/index.ts",
     "dependencies": {
         "@types/node": "^22.15.30",
-        "chalk": "^5.4.1"
+        "chalk": "^5.4.1",
+        "timer-node": "^5.0.9"
     },
     "bin": {
         "dotest": "./bin/index.js"

@@ -4,7 +4,7 @@ import type { StrictConfig } from "./types.ts";
 const config: StrictConfig = {
     testTimeout: 5000,
     testNamePattern: "\\.spec\\.ts$",
-    includeDirectories: ["tests", "src/tests"],
+    includeDirectories: [],
     excludeDirectories: ["node_modules", "dist", "build", "coverage", ".git"],
     reporter: reporter,
 };

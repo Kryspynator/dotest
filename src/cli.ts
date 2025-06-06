@@ -15,7 +15,13 @@ if (existsSync(configPath)) {
     userConfig = (await import(pathToFileURL(configPath).href)).default;
 }
 
-const { excludeDirectories, includeDirectories, testNamePattern, reporter } = {
+const {
+    excludeDirectories,
+    includeDirectories,
+    testNamePattern,
+    reporter,
+    testTimeout,
+} = {
     ...defaultConfig,
     ...userConfig,
 };
@@ -35,9 +41,10 @@ async function findTestFiles(dir: string, pattern: string): Promise<string[]> {
                     excludeDirectories.some((dir) =>
                         RegExp(dir).test(entry.name)
                     ) ||
-                    !includeDirectories.some((dir) =>
-                        RegExp(dir).test(entry.name)
-                    )
+                    (includeDirectories.length &&
+                        !includeDirectories.some((dir) =>
+                            RegExp(dir).test(entry.name)
+                        ))
                 )
                     continue;
 
@@ -67,4 +74,4 @@ await Promise.all(
     })
 );
 
-run({ reporter });
+run({ reporter, testTimeout });

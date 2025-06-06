@@ -1,3 +1,5 @@
+import { Timer } from "timer-node";
+import { reporter } from "./reporter.ts";
 import type {
     AfterFunc,
     BeforeFunc,
@@ -12,7 +14,8 @@ import type {
 export class Dotest {
     rootSuite: Suite<any, any>;
     currentSuite: Suite<any, any>;
-    reporter: Reporter = {} as Reporter;
+    reporter: Reporter = reporter;
+    testTimeout: number = 5000;
 
     constructor() {
         this.rootSuite = this.createSuite("root", null);
@@ -191,8 +194,9 @@ export class Dotest {
         };
     }
 
-    async run({ reporter }: RunArgs) {
+    async run({ reporter, testTimeout }: RunArgs) {
         this.reporter = reporter;
+        this.testTimeout = testTimeout;
 
         reporter.info("🧪 Running tests...\n");
 
@@ -237,21 +241,56 @@ export class Dotest {
         );
 
         let data: BE | null = null;
-
         try {
-            data = await beforeEach();
             try {
+                data = await beforeEach();
                 try {
-                    await test.fn(beforeAllData, data);
+                    let done = false;
+                    const timer = new Timer();
+                    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+                    const timeout = new Promise((_, reject) => {
+                        timeoutId = setTimeout(() => {
+                            if (!done) {
+                                reject(
+                                    new Error(
+                                        `Test "${test.name}" timed out after ${this.testTimeout}ms`
+                                    )
+                                );
+                            }
+                        }, this.testTimeout);
+                    });
+                    try {
+                        timer.start();
+                        await Promise.race([
+                            test.fn(beforeAllData, data),
+                            timeout,
+                        ]);
+                        done = true;
+                        clearTimeout(timeoutId);
 
-                    this.reporter.passedTest(depth + 1);
+                        timer.stop();
+                        const elapsed = timer.ms();
+                        this.reporter.passedTest(elapsed, depth + 1);
+                    } catch (error: any) {
+                        clearTimeout(timeoutId);
+                        timer.stop();
+                        error.message = `${error.message}`;
+                        error.wasThrown = true;
+                        throw error;
+                    } finally {
+                        afterEach(data);
+                    }
                 } catch (error: any) {
-                    this.reporter.failedTest(error, depth + 1);
-                } finally {
-                    afterEach(data);
+                    if (error.wasThrown) throw error;
+                    error.wasThrown = true;
+                    error.message = `Error in after each for "${test.name}": ${error.message}`;
+                    throw error;
                 }
             } catch (error: any) {
-                this.reporter.failedTest(error, depth + 1);
+                if (error.wasThrown) throw error;
+                error.wasThrown = true;
+                error.message = `Error in before each for "${test.name}": ${error.message}`;
+                throw error;
             }
         } catch (error: any) {
             this.reporter.failedTest(error, depth + 1);

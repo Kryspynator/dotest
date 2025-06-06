@@ -4,7 +4,7 @@ export type Prettify<T> = {
 
 export interface Reporter {
     failedTest: (error: Error, depth: number) => void;
-    passedTest: (depth: number) => void;
+    passedTest: (elapsed: number, depth: number) => void;
     startedSpec: (name: string, depth: number) => void;
     startedTest: (name: string, depth: number) => void;
     info: (message: string) => void;
@@ -12,6 +12,7 @@ export interface Reporter {
 
 export interface RunArgs {
     reporter: Reporter;
+    testTimeout: number;
 }
 
 export interface StrictConfig {
