@@ -1,3 +1,3 @@
 #!/usr/bin/env node
 
-import "./cli.ts";
+import "../src/cli.ts";
