@@ -5,5 +5,8 @@
     "license": "ISC",
     "author": "Dotan Krispin",
     "type": "module",
-    "main": "src/index.ts"
+    "main": "src/index.ts",
+    "dependencies": {
+        "@types/node": "^22.15.30"
+    }
 }

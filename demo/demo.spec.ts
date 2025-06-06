@@ -1,4 +1,4 @@
-import { test, run, expect, before, after } from "../src/index.ts";
+import { test, expect, before, after } from "../src/index.ts";
 
 test("Dotest Framework", () => {
     before.all(() => {
@@ -31,5 +31,3 @@ test("Dotest Framework", () => {
         console.log(`Received info: ${info}`);
     });
 });
-
-run();

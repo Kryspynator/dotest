@@ -1,32 +1,11 @@
-type OptionallyAsync<T> = T | Promise<T>;
-
-type BeforeFunc<Data> = () => OptionallyAsync<Data>;
-
-type AfterFunc<Data> = (data: Data) => OptionallyAsync<void>;
-
-type TestFunc<BeforeAllData, BeforeEachData> = (
-    beforeAllData: BeforeAllData,
-    beforeEachData: BeforeEachData
-) => OptionallyAsync<BeforeAllData & BeforeEachData> | OptionallyAsync<void>;
-
-type TestCaseFunc<BeforeAllData, BeforeEachData, TestCaseData> = (
-    beforeAllData: BeforeAllData,
-    beforeEachData: BeforeEachData,
-    testCaseData: TestCaseData
-) => OptionallyAsync<BeforeAllData & BeforeEachData> | OptionallyAsync<void>;
-
-type Test<BA, BE> = { name: string; fn: TestFunc<BA, BE> };
-
-interface Suite<BA, BE> {
-    name: string;
-    parent: Suite<any, any> | null;
-    children: Suite<any, any>[];
-    tests: Test<BA, BE>[];
-    beforeAll: BeforeFunc<BA>;
-    afterAll: AfterFunc<BA>;
-    beforeEach: BeforeFunc<BE>;
-    afterEach: AfterFunc<BE>;
-}
+import type {
+    AfterFunc,
+    BeforeFunc,
+    Suite,
+    Test,
+    TestCaseFunc,
+    TestFunc,
+} from "./types.ts";
 
 const print = console.log;
 
