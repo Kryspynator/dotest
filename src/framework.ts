@@ -10,7 +10,6 @@ import type {
     TestCaseFunc,
     TestFunc,
 } from "./types.ts";
-
 export class Dotest {
     rootSuite: Suite<any, any>;
     currentSuite: Suite<any, any>;
@@ -31,10 +30,12 @@ export class Dotest {
             parent,
             children: [],
             tests: [],
-            beforeAll: () => {},
-            afterAll: () => {},
-            beforeEach: () => {},
-            afterEach: () => {},
+            hooks: {
+                beforeAll: () => {},
+                afterAll: () => {},
+                beforeEach: () => {},
+                afterEach: () => {},
+            },
         };
     }
 
@@ -102,19 +103,19 @@ export class Dotest {
     }
 
     beforeAll<Data>(fn: BeforeFunc<Data>) {
-        this.currentSuite.beforeAll = fn;
+        this.currentSuite.hooks.beforeAll = fn;
     }
 
     afterAll<Data>(fn: AfterFunc<Data>) {
-        this.currentSuite.afterAll = fn;
+        this.currentSuite.hooks.afterAll = fn;
     }
 
     beforeEach<Data>(fn: BeforeFunc<Data>) {
-        this.currentSuite.beforeEach = fn;
+        this.currentSuite.hooks.beforeEach = fn;
     }
 
     afterEach<Data>(fn: AfterFunc<Data>) {
-        this.currentSuite.afterEach = fn;
+        this.currentSuite.hooks.afterEach = fn;
     }
 
     expect<T>(actual: T) {
@@ -210,7 +211,7 @@ export class Dotest {
             this.reporter.startedSpec(suite.name, depth);
         }
 
-        const data = await suite.beforeAll();
+        const data = await suite.hooks.beforeAll();
 
         for (const test of suite.tests) {
             await this.executeTestWithHooks(test, suite, depth + 1, data);
@@ -220,7 +221,7 @@ export class Dotest {
             await this.executeSuite(child, depth + 1);
         }
 
-        await suite.afterAll(data);
+        await suite.hooks.afterAll(data);
     }
 
     private async executeTestWithHooks<BA, BE>(
@@ -231,19 +232,10 @@ export class Dotest {
     ) {
         this.reporter.startedTest(test.name, depth);
 
-        const beforeEach: BeforeFunc<BE> = this.collectHookFromRoot(
-            suite,
-            "beforeEach"
-        );
-        const afterEach: AfterFunc<BE> = this.collectHookFromRoot(
-            suite,
-            "afterEach"
-        );
-
-        let data: BE | null = null;
+        let data: BE | undefined;
         try {
             try {
-                data = await beforeEach();
+                data = await suite.hooks.beforeEach();
                 try {
                     let done = false;
                     const timer = new Timer();
@@ -278,7 +270,7 @@ export class Dotest {
                         error.wasThrown = true;
                         throw error;
                     } finally {
-                        afterEach(data);
+                        suite.hooks.afterEach(data);
                     }
                 } catch (error: any) {
                     if (error.wasThrown) throw error;
@@ -295,18 +287,5 @@ export class Dotest {
         } catch (error: any) {
             this.reporter.failedTest(error, depth + 1);
         }
-    }
-
-    collectHookFromRoot(suite, hookType) {
-        let hook;
-        let current = suite;
-
-        // Collect hooks from current suite up to root
-        while (current && current.name !== "root") {
-            hook = current[hookType];
-            current = current.parent;
-        }
-
-        return hook;
     }
 }

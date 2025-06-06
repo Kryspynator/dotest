@@ -66,13 +66,19 @@ export type TestCaseFunc<BeforeAllData, BeforeEachData, TestCaseData> = (
 
 export type Test<BA, BE> = { name: string; fn: TestFunc<BA, BE> };
 
+export interface Hooks<BA, BE> {
+    beforeAll: BeforeFunc<BA>;
+    afterAll: AfterFunc<BA>;
+    beforeEach: BeforeFunc<BE>;
+    afterEach: AfterFunc<BE>;
+}
+
+export type HookVariants = Prettify<keyof Hooks<any, any>>;
+
 export interface Suite<BA, BE> {
     name: string;
     parent: Suite<any, any> | null;
     children: Suite<any, any>[];
     tests: Test<BA, BE>[];
-    beforeAll: BeforeFunc<BA>;
-    afterAll: AfterFunc<BA>;
-    beforeEach: BeforeFunc<BE>;
-    afterEach: AfterFunc<BE>;
+    hooks: Hooks<BA, BE>;
 }
