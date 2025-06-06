@@ -8,5 +8,8 @@
     "main": "src/index.ts",
     "dependencies": {
         "@types/node": "^22.15.30"
+    },
+    "bin": {
+        "dotest": "./bin/index.js"
     }
 }

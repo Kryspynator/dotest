@@ -13,7 +13,7 @@ export interface StrictConfig {
      * If provided, only tests with names matching this pattern will be executed.
      * Useful for filtering tests based on naming conventions.
      */
-    testNamePattern: RegExp;
+    testNamePattern: string;
     /**
      * An array of directory names to include when searching for test files.
      * If not provided, defaults to an empty array, meaning all directories will be included.

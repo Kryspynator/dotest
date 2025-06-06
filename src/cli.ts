@@ -1,21 +1,28 @@
 import defaultConfig from "./default.config.ts";
-import { join, extname } from "node:path";
+import { join } from "node:path";
 import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
+import { run } from "./index.ts";
+import { pathToFileURL } from "node:url";
 
 const currentDir = process.cwd();
+
 const configPath = join(currentDir, "dotest.config.ts");
 
 let userConfig = defaultConfig;
 
 if (existsSync(configPath)) {
-    userConfig = await import(configPath);
+    userConfig = (await import(pathToFileURL(configPath).href)).default;
 }
 
-const config = { ...defaultConfig, ...userConfig };
+const { excludeDirectories, includeDirectories, testNamePattern } = {
+    ...defaultConfig,
+    ...userConfig,
+};
 
-async function findTestFiles(dir: string, pattern: RegExp): Promise<string[]> {
+async function findTestFiles(dir: string, pattern: string): Promise<string[]> {
     const testFiles: string[] = [];
+    const regexPattern = new RegExp(pattern);
 
     try {
         const entries = await readdir(dir, { withFileTypes: true });
@@ -24,24 +31,21 @@ async function findTestFiles(dir: string, pattern: RegExp): Promise<string[]> {
             const fullPath = join(dir, entry.name);
 
             if (entry.isDirectory()) {
-                // Skip node_modules and hidden directories
                 if (
-                    entry.name === "node_modules" ||
-                    entry.name.startsWith(".")
-                ) {
+                    excludeDirectories.some((dir) =>
+                        RegExp(dir).test(entry.name)
+                    ) ||
+                    !includeDirectories.some((dir) =>
+                        RegExp(dir).test(entry.name)
+                    )
+                )
                     continue;
-                }
+
                 const nestedFiles = await findTestFiles(fullPath, pattern);
                 testFiles.push(...nestedFiles);
-            } else if (entry.isFile()) {
-                // Check if file extension is .ts or .js and matches the pattern
-                const ext = extname(entry.name);
-                if (
-                    (ext === ".ts" || ext === ".js") &&
-                    pattern.test(entry.name)
-                ) {
-                    testFiles.push(fullPath);
-                }
+            } else if (entry.isFile() && regexPattern.test(entry.name)) {
+                testFiles.push(fullPath);
+                console.log(`Found test file: ${fullPath}`);
             }
         }
     } catch (error) {
@@ -51,14 +55,16 @@ async function findTestFiles(dir: string, pattern: RegExp): Promise<string[]> {
     return testFiles;
 }
 
-const testFiles = await findTestFiles(currentDir, config.testNamePattern);
+const testFiles = await findTestFiles(currentDir, testNamePattern);
 
 await Promise.all(
     testFiles.map(async (file) => {
         try {
-            await import(file);
+            await import(pathToFileURL(file).href);
         } catch (error) {
             console.error(`Error importing test file ${file}:`, error);
         }
     })
 );
+
+run();
