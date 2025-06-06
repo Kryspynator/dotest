@@ -2,6 +2,18 @@ export type Prettify<T> = {
     [K in keyof T]: T[K];
 } & {};
 
+export interface Reporter {
+    failedTest: (error: Error, depth: number) => void;
+    passedTest: (depth: number) => void;
+    startedSpec: (name: string, depth: number) => void;
+    startedTest: (name: string, depth: number) => void;
+    info: (message: string) => void;
+}
+
+export interface RunArgs {
+    reporter: Reporter;
+}
+
 export interface StrictConfig {
     /**
      * The maximum time in milliseconds to wait for a test to complete.
@@ -24,6 +36,12 @@ export interface StrictConfig {
      * If not provided, defaults to an empty array, meaning no directories will be excluded.
      */
     excludeDirectories: string[];
+
+    /**
+     * The reporter to use for logging test results.
+     * This should implement the Reporter interface.
+     */
+    reporter: Reporter;
 }
 
 export type Config = Prettify<Partial<StrictConfig>>;

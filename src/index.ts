@@ -1,4 +1,10 @@
-import type { AfterFunc, BeforeFunc, TestCaseFunc, TestFunc } from "./types.ts";
+import type {
+    AfterFunc,
+    BeforeFunc,
+    RunArgs,
+    TestCaseFunc,
+    TestFunc,
+} from "./types.ts";
 import { Dotest } from "./framework.ts";
 
 const dotest = new Dotest();
@@ -32,4 +38,4 @@ export const test = Object.assign(
 
 export const expect = <T>(actual: T) => dotest.expect(actual);
 
-export const run = () => dotest.run();
+export const run = (args: RunArgs) => dotest.run(args);

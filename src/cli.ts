@@ -15,7 +15,7 @@ if (existsSync(configPath)) {
     userConfig = (await import(pathToFileURL(configPath).href)).default;
 }
 
-const { excludeDirectories, includeDirectories, testNamePattern } = {
+const { excludeDirectories, includeDirectories, testNamePattern, reporter } = {
     ...defaultConfig,
     ...userConfig,
 };
@@ -67,4 +67,4 @@ await Promise.all(
     })
 );
 
-run();
+run({ reporter });

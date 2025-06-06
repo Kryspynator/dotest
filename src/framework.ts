@@ -1,19 +1,18 @@
 import type {
     AfterFunc,
     BeforeFunc,
+    Reporter,
+    RunArgs,
     Suite,
     Test,
     TestCaseFunc,
     TestFunc,
 } from "./types.ts";
 
-const print = console.log;
-
-const indentString = "   ";
-
 export class Dotest {
     rootSuite: Suite<any, any>;
     currentSuite: Suite<any, any>;
+    reporter: Reporter = {} as Reporter;
 
     constructor() {
         this.rootSuite = this.createSuite("root", null);
@@ -171,7 +170,7 @@ export class Dotest {
                     throw new Error(
                         "Expected function to throw, but it did not"
                     );
-                } catch (e) {
+                } catch (e: any) {
                     if (
                         e.message ===
                         "Expected function to throw, but it did not"
@@ -192,19 +191,19 @@ export class Dotest {
         };
     }
 
-    async run() {
-        print("🧪 Running tests...\n");
+    async run({ reporter }: RunArgs) {
+        this.reporter = reporter;
+
+        reporter.info("🧪 Running tests...\n");
 
         await this.executeSuite(this.rootSuite, -1);
 
-        print("\n✅ Test execution complete");
+        reporter.info("\n✅ Test execution complete");
     }
 
     private async executeSuite<BA, BE>(suite: Suite<BA, BE>, depth: number) {
-        const indent = indentString.repeat(Math.max(0, depth));
-
         if (depth >= 0) {
-            print(`${indent}📁 ${suite.name}`);
+            this.reporter.startedSpec(suite.name, depth);
         }
 
         const data = await suite.beforeAll();
@@ -226,8 +225,7 @@ export class Dotest {
         depth: number,
         beforeAllData: BA
     ) {
-        const indent = indentString.repeat(depth);
-        print(`${indent}🔍 ${test.name}`);
+        this.reporter.startedTest(test.name, depth);
 
         const beforeEach: BeforeFunc<BE> = this.collectHookFromRoot(
             suite,
@@ -241,23 +239,22 @@ export class Dotest {
         let data: BE | null = null;
 
         try {
-            const indent = indentString.repeat(depth + 1);
             data = await beforeEach();
             try {
                 try {
                     await test.fn(beforeAllData, data);
 
-                    print(`${indent}✅ Passed`);
+                    this.reporter.passedTest(depth + 1);
                 } catch (error: any) {
-                    print(`${indent}❌ Failed: ${error.message}`);
+                    this.reporter.failedTest(error, depth + 1);
                 } finally {
                     afterEach(data);
                 }
             } catch (error: any) {
-                print(`${indent}❌ Failed In AfterEach: ${error.message}`);
+                this.reporter.failedTest(error, depth + 1);
             }
         } catch (error: any) {
-            console.log(`${indent}❌ Failed In BeforeEach: ${error.message}`);
+            this.reporter.failedTest(error, depth + 1);
         }
     }
 
