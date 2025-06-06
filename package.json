@@ -10,6 +10,6 @@
         "@types/node": "^22.15.30"
     },
     "bin": {
-        "dotest": "./cli/index.js"
+        "dotest": "./bin/index.js"
     }
 }
