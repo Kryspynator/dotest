@@ -1,8 +1,8 @@
 import defaultConfig from "./default.config.ts";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
-import { run } from "./index.ts";
+import { run, enterSuite, leaveSuite } from "./index.ts";
 import { pathToFileURL } from "node:url";
 
 const currentDir = process.cwd();
@@ -64,14 +64,16 @@ async function findTestFiles(dir: string, pattern: string): Promise<string[]> {
 
 const testFiles = await findTestFiles(currentDir, testNamePattern);
 
-await Promise.all(
-    testFiles.map(async (file) => {
-        try {
-            await import(pathToFileURL(file).href);
-        } catch (error) {
-            console.error(`Error importing test file ${file}:`, error);
-        }
-    })
-);
+for (const file of testFiles) {
+    const relativePath = relative(currentDir, file);
+    enterSuite(relativePath);
+    try {
+        await import(pathToFileURL(file).href);
+    } catch (error) {
+        console.error(`Error importing test file ${file}:`, error);
+    }
+    leaveSuite();
+}
 
 run({ reporter, testTimeout });
+

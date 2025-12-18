@@ -66,28 +66,31 @@ export type TestFunc<BeforeAllData, BeforeEachData> = (
 ) => OptionallyAsync<BeforeAllData & BeforeEachData> | OptionallyAsync<void>;
 
 export type TestCaseFunc<BeforeAllData, BeforeEachData, TestCaseData> = (
+    testCaseData: TestCaseData,
     beforeAllData: BeforeAllData,
-    beforeEachData: BeforeEachData,
-    testCaseData: TestCaseData
+    beforeEachData: BeforeEachData
 ) => OptionallyAsync<BeforeAllData & BeforeEachData> | OptionallyAsync<void>;
 
-export type Test<BA, BE> = { name: string; fn: TestFunc<BA, BE> };
+export type Test<BeforeAllData, BeforeEachData> = {
+    name: string;
+    fn: TestFunc<BeforeAllData, BeforeEachData>;
+};
 
-export interface Hooks<BA, BE> {
-    beforeAll: BeforeFunc<BA>;
-    afterAll: AfterFunc<BA>;
-    beforeEach: BeforeFunc<BE>;
-    afterEach: AfterFunc<BE>;
+export interface Hooks<BeforeAllData, BeforeEachData> {
+    beforeAll: BeforeFunc<BeforeAllData>;
+    afterAll: AfterFunc<BeforeAllData>;
+    beforeEach: BeforeFunc<BeforeEachData>;
+    afterEach: AfterFunc<BeforeEachData>;
 }
 
 export type HookVariants = Prettify<keyof Hooks<any, any>>;
 
-export interface Suite<BA, BE> {
+export interface Suite<BeforeAllData, BeforeEachData> {
     name: string;
     parent: Suite<any, any> | null;
     children: Suite<any, any>[];
-    tests: Test<BA, BE>[];
-    hooks: Hooks<BA, BE>;
+    tests: Test<BeforeAllData, BeforeEachData>[];
+    hooks: Hooks<BeforeAllData, BeforeEachData>;
     failed: number;
     passed: number;
 }

@@ -29,7 +29,7 @@ export const test = Object.assign(
     ) => dotest.test(name, fn),
     {
         each: <BeforeAllData, BeforeEachData, TestCaseData>(
-            name: string,
+            name: string | ((data: TestCaseData) => string),
             testCases: TestCaseData[],
             fn: TestCaseFunc<BeforeAllData, BeforeEachData, TestCaseData>
         ) => dotest.testEach(name, testCases, fn),
@@ -39,3 +39,9 @@ export const test = Object.assign(
 export const expect = <T>(actual: T) => dotest.expect(actual);
 
 export const run = (args: RunArgs) => dotest.run(args);
+
+export const suite = (name: string) => dotest.suite(name);
+
+export const enterSuite = (name: string) => dotest.enterSuite(name);
+
+export const leaveSuite = () => dotest.leaveSuite();

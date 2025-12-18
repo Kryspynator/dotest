@@ -13,5 +13,11 @@
     },
     "bin": {
         "dotest": "./bin/index.js"
+    },
+    "scripts": {
+        "test": "dotest",
+        "lint": "eslint .",
+        "lint:fix": "eslint . --fix",
+        "format": "prettier --write ."
     }
 }
