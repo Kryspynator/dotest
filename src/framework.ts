@@ -46,23 +46,7 @@ export class Dotest {
         name: string,
         fn: TestFunc<BeforeAllData, BeforeEachData>
     ) {
-        const hasNestedTests = this.detectNestedTests(fn);
-
-        if (hasNestedTests) {
-            const suite = this.createSuite(name, this.currentSuite);
-            this.currentSuite.children.push(suite);
-
-            const previousSuite = this.currentSuite;
-            this.currentSuite = suite;
-
-            try {
-                fn(undefined as any, undefined as any);
-            } finally {
-                this.currentSuite = previousSuite;
-            }
-        } else {
-            this.currentSuite.tests.push({ name, fn });
-        }
+        this.currentSuite.tests.push({ name, fn });
     }
 
     testEach<BeforeAllData, BeforeEachData, TestCaseData>(
@@ -95,39 +79,6 @@ export class Dotest {
             );
         }
         this.currentSuite = this.currentSuite.parent || this.rootSuite;
-    }
-
-    detectNestedTests<BeforeAllData, BeforeEachData>(
-        fn: TestFunc<BeforeAllData, BeforeEachData>
-    ): boolean {
-        let hasNested = false;
-        const originalTest = this.test.bind(this);
-        const originalBeforeAll = this.beforeAll.bind(this);
-        const originalAfterAll = this.afterAll.bind(this);
-        const originalBeforeEach = this.beforeEach.bind(this);
-        const originalAfterEach = this.afterEach.bind(this);
-
-        this.test = () => {
-            hasNested = true;
-        };
-        this.beforeAll = () => {};
-        this.afterAll = () => {};
-        this.beforeEach = () => {};
-        this.afterEach = () => {};
-
-        try {
-            fn(undefined as any, undefined as any);
-        } catch (_e) {
-            hasNested = false;
-        } finally {
-            this.test = originalTest;
-            this.beforeAll = originalBeforeAll;
-            this.afterAll = originalAfterAll;
-            this.beforeEach = originalBeforeEach;
-            this.afterEach = originalAfterEach;
-        }
-
-        return hasNested;
     }
 
     beforeAll<Data>(fn: BeforeFunc<Data>) {
