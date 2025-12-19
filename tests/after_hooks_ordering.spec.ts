@@ -12,10 +12,9 @@ suite("After Hooks Ordering Suite")
 
 // We need a way to verify the hook ran *after* the suite finishes.
 // Since we can't easily assert outside the suite in this framework yet without another suite,
-// we'll rely on the fact that if the hook doesn't run, we might be able to detect it 
+// we'll rely on the fact that if the hook doesn't run, we might be able to detect it
 // or we can add another suite that checks the global variable.
 
-suite("Verification Suite")
-    .test("verify hook ran", () => {
-        expect(hookRan).toBe(true);
-    });
+suite("Verification Suite").test("verify hook ran", () => {
+    expect(hookRan).toBe(true);
+});

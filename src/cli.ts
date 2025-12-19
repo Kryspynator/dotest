@@ -76,4 +76,3 @@ for (const file of testFiles) {
 }
 
 run({ reporter, testTimeout });
-

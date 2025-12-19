@@ -22,10 +22,7 @@ export class Dotest {
         this.currentSuite = this.rootSuite;
     }
 
-    createSuite(
-        name: string,
-        parent: Suite<any, any> | null
-    ): Suite<any, any> {
+    createSuite(name: string, parent: Suite<any, any> | null): Suite<any, any> {
         return {
             name,
             parent,
@@ -349,8 +346,6 @@ export class Dotest {
     }
 }
 
-
-
 export class SuiteBuilder<BeforeAllData = unknown, BeforeEachData = unknown> {
     private beforeAllFn: BeforeFunc<any> = () => {};
     private beforeEachFn: BeforeFunc<any> = () => {};
@@ -453,4 +448,3 @@ export class SuiteBuilder<BeforeAllData = unknown, BeforeEachData = unknown> {
         return this;
     }
 }
-
