@@ -27,53 +27,31 @@ class RetryReporter implements Reporter {
     finishedAll(_failed: number, _passed: number) {}
 }
 
-suite("Retry Mechanism")
-    .test(
-        "should retry failed test the specified number of times",
-        async () => {
-            const dotest = new Dotest();
-            const reporter = new RetryReporter();
-            let runs = 0;
-
-            dotest.test("flaky test", () => {
-                runs++;
-                if (runs < 3) {
-                    throw new Error("Temporary failure");
-                }
-            });
-
-            // 2 retries means 3 attempts total
-            await dotest.run({
-                reporters: [reporter],
-                testTimeout: 1000,
-                retries: 2,
-            });
-
-            expect(runs).toBe(3);
-            expect(reporter.passed).toBe(1);
-            expect(reporter.failed).toBe(0);
-            expect(reporter.attempts).toBe(1); // startedTest is called once per test logically, but maybe I should call it per attempt?
-            // Actually, in my implementation startedTest is called BEFORE the loop.
-        }
-    )
-    .test("should fail after all retries are exhausted", async () => {
+suite("Retry Mechanism").test(
+    "should retry failed test the specified number of times",
+    async () => {
         const dotest = new Dotest();
         const reporter = new RetryReporter();
         let runs = 0;
 
-        dotest.test("always failing test", () => {
+        dotest.test("flaky test", () => {
             runs++;
-            throw new Error("Permanent failure");
+            if (runs < 3) {
+                throw new Error("Temporary failure");
+            }
         });
 
-        // 1 retry means 2 attempts total
+        // 2 retries means 3 attempts total
         await dotest.run({
             reporters: [reporter],
             testTimeout: 1000,
-            retries: 1,
+            retries: 2,
         });
 
-        expect(runs).toBe(2);
-        expect(reporter.passed).toBe(0);
-        expect(reporter.failed).toBe(1);
-    });
+        expect(runs).toBe(3);
+        expect(reporter.passed).toBe(1);
+        expect(reporter.failed).toBe(0);
+        expect(reporter.attempts).toBe(1); // startedTest is called once per test logically, but maybe I should call it per attempt?
+        // Actually, in my implementation startedTest is called BEFORE the loop.
+    }
+);

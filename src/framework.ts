@@ -306,10 +306,11 @@ export class SuiteBuilder<BeforeAllData = unknown, BeforeEachData = unknown> {
     private dotest: Dotest;
     private suite: Suite<any, any>;
 
-    constructor(dotest: Dotest, name: string) {
+    constructor(dotest: Dotest, name: string, parentSuite?: Suite<any, any>) {
         this.dotest = dotest;
-        this.suite = this.dotest.createSuite(name, this.dotest.currentSuite);
-        this.dotest.currentSuite.children.push(this.suite);
+        const parent = parentSuite || this.dotest.currentSuite;
+        this.suite = this.dotest.createSuite(name, parent);
+        parent.children.push(this.suite);
     }
 
     beforeAll<T>(
@@ -360,6 +361,31 @@ export class SuiteBuilder<BeforeAllData = unknown, BeforeEachData = unknown> {
 
     test(name: string, fn: TestFunc<BeforeAllData, BeforeEachData>) {
         this.suite.tests.push({ name, fn });
+        return this;
+    }
+
+    subsuite(
+        name: string,
+        fn: (subsuite: SuiteBuilder<BeforeAllData, BeforeEachData>) => void
+    ): this {
+        const subsuiteBuilder = new SuiteBuilder<BeforeAllData, BeforeEachData>(
+            this.dotest,
+            name,
+            this.suite
+        );
+
+        // Inherit hooks from parent
+        subsuiteBuilder.beforeAllFn = this.beforeAllFn;
+        subsuiteBuilder.beforeEachFn = this.beforeEachFn;
+        subsuiteBuilder.afterAllFn = this.afterAllFn;
+        subsuiteBuilder.afterEachFn = this.afterEachFn;
+
+        subsuiteBuilder.suite.hooks.beforeAll = this.beforeAllFn;
+        subsuiteBuilder.suite.hooks.beforeEach = this.beforeEachFn;
+        subsuiteBuilder.suite.hooks.afterAll = this.afterAllFn;
+        subsuiteBuilder.suite.hooks.afterEach = this.afterEachFn;
+
+        fn(subsuiteBuilder);
         return this;
     }
 
