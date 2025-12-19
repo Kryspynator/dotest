@@ -1,4 +1,5 @@
-import { suite, expect, Dotest } from "../src/index.ts";
+import { Dotest } from "../src/framework.ts";
+import { suite, expect } from "../src/index.ts";
 import type { Reporter } from "../src/index.ts";
 
 class RetryReporter implements Reporter {
@@ -32,11 +33,11 @@ suite("Retry Mechanism")
         async () => {
             const dotest = new Dotest();
             const reporter = new RetryReporter();
-            let failCount = 0;
+            let runs = 0;
 
             dotest.test("flaky test", () => {
-                failCount++;
-                if (failCount < 3) {
+                runs++;
+                if (runs < 3) {
                     throw new Error("Temporary failure");
                 }
             });
@@ -48,7 +49,7 @@ suite("Retry Mechanism")
                 retries: 2,
             });
 
-            expect(failCount).toBe(3);
+            expect(runs).toBe(3);
             expect(reporter.passed).toBe(1);
             expect(reporter.failed).toBe(0);
             expect(reporter.attempts).toBe(1); // startedTest is called once per test logically, but maybe I should call it per attempt?
@@ -58,10 +59,10 @@ suite("Retry Mechanism")
     .test("should fail after all retries are exhausted", async () => {
         const dotest = new Dotest();
         const reporter = new RetryReporter();
-        let failCount = 0;
+        let runs = 0;
 
         dotest.test("always failing test", () => {
-            failCount++;
+            runs++;
             throw new Error("Permanent failure");
         });
 
@@ -72,7 +73,7 @@ suite("Retry Mechanism")
             retries: 1,
         });
 
-        expect(failCount).toBe(2);
+        expect(runs).toBe(2);
         expect(reporter.passed).toBe(0);
         expect(reporter.failed).toBe(1);
     });

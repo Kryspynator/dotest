@@ -2,7 +2,7 @@ import defaultConfig from "./default.config.ts";
 import { join, relative } from "node:path";
 import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
-import { run, enterSuite, leaveSuite } from "./index.ts";
+import { enterSuite, leaveSuite, run } from "./index.ts";
 import { pathToFileURL } from "node:url";
 
 const currentDir = process.cwd();

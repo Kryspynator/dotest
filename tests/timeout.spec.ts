@@ -1,10 +1,10 @@
 import { suite, expect } from "../src/index.ts";
 import { Dotest } from "../src/framework.ts";
-import type { Reporter } from "../src/types.ts";
+import type { Reporter } from "../src/index.ts";
 
 class TestReporter implements Reporter {
-    failed: number = 0;
-    passed: number = 0;
+    failed = 0;
+    passed = 0;
 
     failedTest(_error: Error, _depth: number) {
         this.failed++;
@@ -33,10 +33,7 @@ suite("Timeout Functionality")
     })
     .test(
         "should fail when test exceeds default timeout",
-        async (
-            _: any,
-            { dotest, reporter }: { dotest: Dotest; reporter: TestReporter }
-        ) => {
+        async (_, { dotest, reporter }) => {
             dotest.test("slow test", async () => {
                 await new Promise((resolve) => setTimeout(resolve, 200));
             });
@@ -53,10 +50,7 @@ suite("Timeout Functionality")
     )
     .test(
         "should pass when test completes within timeout",
-        async (
-            _: any,
-            { dotest, reporter }: { dotest: Dotest; reporter: TestReporter }
-        ) => {
+        async (_, { dotest, reporter }) => {
             dotest.test("fast test", async () => {
                 await new Promise((resolve) => setTimeout(resolve, 50));
             });
@@ -73,10 +67,7 @@ suite("Timeout Functionality")
     )
     .test(
         "should use configured global timeout",
-        async (
-            _: any,
-            { dotest, reporter }: { dotest: Dotest; reporter: TestReporter }
-        ) => {
+        async (_, { dotest, reporter }) => {
             expect(dotest.testTimeout).toBe(5000);
 
             await dotest.run({

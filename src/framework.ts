@@ -12,6 +12,7 @@ import type {
     TestFunc,
     OptionallyAsync,
 } from "./types.ts";
+
 export class Dotest {
     rootSuite: Suite<any, any>;
     currentSuite: Suite<any, any>;
