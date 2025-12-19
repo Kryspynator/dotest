@@ -7,6 +7,7 @@ const config: StrictConfig = {
     includeDirectories: [],
     excludeDirectories: ["node_modules", "dist", "build", "coverage", ".git"],
     reporter: defaultReporter,
+    retries: 0,
 };
 
 export default config;

@@ -6,7 +6,6 @@ import type {
     TestFunc,
 } from "./types.ts";
 import { Dotest } from "./framework.ts";
-
 const dotest = new Dotest();
 
 // Exports
@@ -45,3 +44,5 @@ export const suite = (name: string) => dotest.suite(name);
 export const enterSuite = (name: string) => dotest.enterSuite(name);
 
 export const leaveSuite = () => dotest.leaveSuite();
+
+export { Dotest };

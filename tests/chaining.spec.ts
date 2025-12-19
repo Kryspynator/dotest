@@ -13,16 +13,19 @@ suite("Chaining Suite - Hooks")
     .beforeAll(() => ({ b: 2 }))
     .beforeEach(() => ({ c: 3 }))
     .beforeEach(() => ({ d: 4 }))
-    .test("receives all data", (all, each) => {
-        expect(all).toEqual({ a: 1, b: 2 });
-        expect(each).toEqual({ c: 3, d: 4 });
-    });
+    .test(
+        "receives all data",
+        (all: { a: number; b: number }, each: { c: number; d: number }) => {
+            expect(all).toEqual({ a: 1, b: 2 });
+            expect(each).toEqual({ c: 3, d: 4 });
+        }
+    );
 
 suite("Chaining Suite - Mixed Tests")
     .test("normal test", () => {
         expect(true).toBe(true);
     })
-    .testEach("parameterized", [1, 2], (val) => {
+    .testEach("parameterized", [1, 2], (val: number) => {
         expect(val).toBeDefined();
     })
     .test("another normal test", () => {
@@ -31,10 +34,10 @@ suite("Chaining Suite - Mixed Tests")
 
 suite("Chaining Suite - Data Flow")
     .beforeAll(() => ({ count: 0 }))
-    .test("first", (all) => {
+    .test("first", (all: { count: number }) => {
         expect(all.count).toBe(0);
     })
-    .test("second", (all) => {
+    .test("second", (all: { count: number }) => {
         // Data is immutable per test run context in this implementation
         expect(all.count).toBe(0);
     });
@@ -44,6 +47,6 @@ suite("Chaining Suite - Async Hooks")
         await new Promise((r) => setTimeout(r, 10));
         return { async: true };
     })
-    .test("async data", (all) => {
+    .test("async data", (all: { async: boolean }) => {
         expect(all.async).toBe(true);
     });

@@ -38,7 +38,7 @@ export const defaultReporter: Reporter = {
         name: string,
         depth: number,
         failed: number,
-        passed: number
+        _passed: number
     ) => {
         if (depth < 0) return;
         const indent = indentString.repeat(depth);

@@ -4,7 +4,7 @@ suite("After Hooks Injection Suite")
     .beforeAll(() => {
         return { db: "connected" };
     })
-    .afterAll((data) => {
+    .afterAll((data: { db: string }) => {
         expect(data.db).toBe("connected");
     })
     .test("dummy test for all hooks", () => {
@@ -15,7 +15,7 @@ suite("After Each Hooks Injection Suite")
     .beforeEach(() => {
         return { user: "admin" };
     })
-    .afterEach((data) => {
+    .afterEach((data: { user: string }) => {
         expect(data.user).toBe("admin");
     })
     .test("dummy test for each hooks", () => {

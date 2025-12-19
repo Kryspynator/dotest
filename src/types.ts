@@ -20,6 +20,7 @@ export interface Reporter {
 export interface RunArgs {
     reporter: Reporter;
     testTimeout: number;
+    retries: number;
 }
 
 export interface StrictConfig {
@@ -45,6 +46,10 @@ export interface StrictConfig {
      */
     excludeDirectories: string[];
 
+    /**
+     * The number of times to retry a failed test.
+     */
+    retries: number;
     /**
      * The reporter to use for logging test results.
      * This should implement the Reporter interface.

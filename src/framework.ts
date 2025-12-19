@@ -1,5 +1,6 @@
 import { Timer } from "timer-node";
 import { defaultReporter } from "./reporter.ts";
+import { expect as expectModule } from "./expect.ts";
 import type {
     AfterFunc,
     BeforeFunc,
@@ -16,6 +17,7 @@ export class Dotest {
     currentSuite: Suite<any, any>;
     reporter: Reporter = defaultReporter;
     testTimeout: number = 5000;
+    retries: number = 0;
 
     constructor() {
         this.rootSuite = this.createSuite("root", null);
@@ -53,7 +55,7 @@ export class Dotest {
             this.currentSuite = suite;
 
             try {
-                fn();
+                fn(undefined as any, undefined as any);
             } finally {
                 this.currentSuite = previousSuite;
             }
@@ -113,8 +115,8 @@ export class Dotest {
         this.afterEach = () => {};
 
         try {
-            fn();
-        } catch (e) {
+            fn(undefined as any, undefined as any);
+        } catch (_e) {
             hasNested = false;
         } finally {
             this.test = originalTest;
@@ -144,90 +146,13 @@ export class Dotest {
     }
 
     expect<T>(actual: T) {
-        const assertions = {
-            toBe(expected: T) {
-                if (!Object.is(actual, expected)) {
-                    throw new Error(`Expected ${actual} to be ${expected}`);
-                }
-            },
-            toEqual(expected: T) {
-                if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-                    throw new Error(
-                        `Expected ${JSON.stringify(
-                            actual
-                        )} to equal ${JSON.stringify(expected)}`
-                    );
-                }
-            },
-            toBeTruthy() {
-                if (!actual) {
-                    throw new Error(`Expected ${actual} to be truthy`);
-                }
-            },
-            toBeFalsy() {
-                if (actual) {
-                    throw new Error(`Expected ${actual} to be falsy`);
-                }
-            },
-            toBeDefined() {
-                if (typeof actual === "undefined") {
-                    throw new Error(`Expected ${actual} to be defined`);
-                }
-            },
-            toBeNullish() {
-                if (actual !== null && actual !== undefined) {
-                    throw new Error(
-                        `Expected ${actual} to be null or undefined`
-                    );
-                }
-            },
-            toBeUndefined() {
-                if (typeof actual !== "undefined") {
-                    throw new Error(`Expected ${actual} to be undefined`);
-                }
-            },
-            toBeInstanceOf(expected: any) {
-                if (!(actual instanceof expected)) {
-                    throw new Error(
-                        `Expected ${actual} to be an instance of ${expected}`
-                    );
-                }
-            },
-            toThrow(data?: any) {
-                if (typeof actual !== "function") {
-                    throw new Error(
-                        "Expected value must be a function when using toThrow"
-                    );
-                }
-                try {
-                    actual(...data);
-                    throw new Error(
-                        "Expected function to throw, but it did not"
-                    );
-                } catch (e: any) {
-                    if (
-                        e.message ===
-                        "Expected function to throw, but it did not"
-                    ) {
-                        throw e;
-                    }
-                }
-            },
-        };
-
-        function not() {
-            throw new Error("Not implemented yet");
-        }
-
-        return {
-            ...assertions,
-            not,
-        };
+        return expectModule(actual);
     }
 
-    async run({ reporter, testTimeout }: RunArgs) {
+    async run({ reporter, testTimeout, retries }: RunArgs) {
         this.reporter = reporter;
         this.testTimeout = testTimeout;
+        this.retries = retries;
 
         this.reporter.startedAll();
         await this.executeSuite(this.rootSuite, -1);
@@ -236,26 +161,26 @@ export class Dotest {
 
     private async executeSuite<BeforeAllData, BeforeEachData>(
         suite: Suite<BeforeAllData, BeforeEachData>,
-        depth: number
+        _depth: number
     ) {
-        if (depth >= 0) {
-            this.reporter.startedSuite(suite.name, depth);
+        if (_depth >= 0) {
+            this.reporter.startedSuite(suite.name, _depth);
         }
 
         const data = await suite.hooks.beforeAll();
 
         for (const test of suite.tests) {
-            await this.executeTest(test, suite, depth + 1, data);
+            await this.executeTest(test, suite, _depth + 1, data);
         }
 
         for (const child of suite.children) {
-            await this.executeSuite(child, depth + 1);
+            await this.executeSuite(child, _depth + 1);
         }
 
         await suite.hooks.afterAll(data);
         this.reporter.finishedSuite(
             suite.name,
-            depth,
+            _depth,
             suite.failed,
             suite.passed
         );
@@ -264,69 +189,83 @@ export class Dotest {
     private async executeTest<BeforeAllData, BeforeEachData>(
         test: Test<BeforeAllData, BeforeEachData>,
         suite: Suite<BeforeAllData, BeforeEachData>,
-        depth: number,
+        _depth: number,
         beforeAllData: BeforeAllData
     ) {
-        this.reporter.startedTest(test.name, depth);
+        this.reporter.startedTest(test.name, _depth);
 
-        let data: BeforeEachData | undefined;
-        try {
+        let attempts = 0;
+        const maxAttempts = this.retries + 1;
+
+        while (attempts < maxAttempts) {
+            let data: BeforeEachData | undefined;
             try {
-                data = await suite.hooks.beforeEach();
                 try {
-                    let done = false;
-                    const timer = new Timer();
-                    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-                    const timeout = new Promise((_, reject) => {
-                        timeoutId = setTimeout(() => {
-                            if (!done) {
-                                reject(
-                                    new Error(
-                                        `Test "${test.name}" timed out after ${this.testTimeout}ms`
-                                    )
-                                );
-                            }
-                        }, this.testTimeout);
-                    });
+                    data = await suite.hooks.beforeEach();
                     try {
-                        timer.start();
-                        await Promise.race([
-                            test.fn(beforeAllData, data),
-                            timeout,
-                        ]);
-                        done = true;
-                        clearTimeout(timeoutId);
+                        let done = false;
+                        const timer = new Timer();
+                        let timeoutId:
+                            | ReturnType<typeof setTimeout>
+                            | undefined;
+                        const timeout = new Promise((_, reject) => {
+                            timeoutId = setTimeout(() => {
+                                if (!done) {
+                                    reject(
+                                        new Error(
+                                            `Test "${test.name}" timed out after ${this.testTimeout}ms`
+                                        )
+                                    );
+                                }
+                            }, this.testTimeout);
+                        });
+                        try {
+                            timer.start();
+                            await Promise.race([
+                                test.fn(beforeAllData, data),
+                                timeout,
+                            ]);
+                            done = true;
+                            clearTimeout(timeoutId);
 
-                        timer.stop();
-                        const elapsed = timer.ms();
-                        suite.passed++;
-                        this.rootSuite.passed++;
-                        this.reporter.passedTest(elapsed, depth + 1);
+                            timer.stop();
+                            const elapsed = timer.ms();
+                            suite.passed++;
+                            this.rootSuite.passed++;
+                            this.reporter.passedTest(elapsed, _depth + 1);
+                            return; // Test passed, exit retry loop
+                        } catch (error: any) {
+                            clearTimeout(timeoutId);
+                            timer.stop();
+                            error.message = `${error.message}`;
+                            error.wasThrown = true;
+                            throw error;
+                        } finally {
+                            await suite.hooks.afterEach(data);
+                        }
                     } catch (error: any) {
-                        clearTimeout(timeoutId);
-                        timer.stop();
-                        error.message = `${error.message}`;
+                        if (error.wasThrown) throw error;
                         error.wasThrown = true;
+                        error.message = `Error in after each for "${test.name}": ${error.message}`;
                         throw error;
-                    } finally {
-                        suite.hooks.afterEach(data);
                     }
                 } catch (error: any) {
                     if (error.wasThrown) throw error;
                     error.wasThrown = true;
-                    error.message = `Error in after each for "${test.name}": ${error.message}`;
+                    error.message = `Error in before each for "${test.name}": ${error.message}`;
                     throw error;
                 }
             } catch (error: any) {
-                if (error.wasThrown) throw error;
-                error.wasThrown = true;
-                error.message = `Error in before each for "${test.name}": ${error.message}`;
-                throw error;
+                attempts++;
+                console.log(
+                    `[DEBUG] Attempt ${attempts} failed for "${test.name}"`
+                );
+                if (attempts >= maxAttempts) {
+                    suite.failed++;
+                    this.rootSuite.failed++;
+                    this.reporter.failedTest(error, _depth + 1);
+                }
             }
-        } catch (error: any) {
-            suite.failed++;
-            this.rootSuite.failed++;
-            this.reporter.failedTest(error, depth + 1);
         }
     }
     suite(name: string) {

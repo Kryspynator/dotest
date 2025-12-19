@@ -18,13 +18,31 @@ if (existsSync(configPath)) {
 const {
     excludeDirectories,
     includeDirectories,
-    testNamePattern,
+    testNamePattern: configPattern,
     reporter,
-    testTimeout,
+    testTimeout: configTimeout,
+    retries: configRetries,
 } = {
     ...defaultConfig,
     ...userConfig,
 };
+
+// Simple CLI Argument Parsing
+const args = process.argv.slice(2);
+let testTimeout = configTimeout;
+let retries = configRetries;
+let testNamePattern = configPattern;
+
+for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--timeout" || arg === "-t") {
+        testTimeout = parseInt(args[++i], 10);
+    } else if (arg === "--retries" || arg === "-r") {
+        retries = parseInt(args[++i], 10);
+    } else if (arg === "--pattern" || arg === "-p") {
+        testNamePattern = args[++i];
+    }
+}
 
 async function findTestFiles(dir: string, pattern: string): Promise<string[]> {
     const testFiles: string[] = [];
@@ -75,4 +93,4 @@ for (const file of testFiles) {
     leaveSuite();
 }
 
-run({ reporter, testTimeout });
+run({ reporter, testTimeout, retries });
