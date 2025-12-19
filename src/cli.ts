@@ -19,7 +19,7 @@ const {
     excludeDirectories,
     includeDirectories,
     testNamePattern: configPattern,
-    reporter,
+    reporters,
     testTimeout: configTimeout,
     retries: configRetries,
 } = {
@@ -93,4 +93,4 @@ for (const file of testFiles) {
     leaveSuite();
 }
 
-run({ reporter, testTimeout, retries });
+run({ reporters: reporters, testTimeout, retries });

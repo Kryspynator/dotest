@@ -41,8 +41,11 @@ suite("Timeout Functionality")
                 await new Promise((resolve) => setTimeout(resolve, 200));
             });
 
-            // Run with short timeout
-            await dotest.run({ reporter, testTimeout: 100, retries: 0 });
+            await dotest.run({
+                reporters: [reporter],
+                testTimeout: 100,
+                retries: 0,
+            });
 
             expect(reporter.passed).toBe(0);
             expect(reporter.failed).toBe(1);
@@ -58,8 +61,11 @@ suite("Timeout Functionality")
                 await new Promise((resolve) => setTimeout(resolve, 50));
             });
 
-            // Run with sufficient timeout
-            await dotest.run({ reporter, testTimeout: 100, retries: 0 });
+            await dotest.run({
+                reporters: [reporter],
+                testTimeout: 100,
+                retries: 0,
+            });
 
             expect(reporter.passed).toBe(1);
             expect(reporter.failed).toBe(0);
@@ -71,10 +77,13 @@ suite("Timeout Functionality")
             _: any,
             { dotest, reporter }: { dotest: Dotest; reporter: TestReporter }
         ) => {
-            // Verify default is 5000
             expect(dotest.testTimeout).toBe(5000);
 
-            await dotest.run({ reporter, testTimeout: 1000, retries: 0 });
+            await dotest.run({
+                reporters: [reporter],
+                testTimeout: 1000,
+                retries: 0,
+            });
 
             expect(dotest.testTimeout).toBe(1000);
         }

@@ -6,7 +6,7 @@ const config: StrictConfig = {
     testNamePattern: "\\.spec\\.ts$",
     includeDirectories: [],
     excludeDirectories: ["node_modules", "dist", "build", "coverage", ".git"],
-    reporter: defaultReporter,
+    reporters: [defaultReporter],
     retries: 0,
 };
 

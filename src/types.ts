@@ -18,7 +18,7 @@ export interface Reporter {
 }
 
 export interface RunArgs {
-    reporter: Reporter;
+    reporters: Reporter[];
     testTimeout: number;
     retries: number;
 }
@@ -54,7 +54,7 @@ export interface StrictConfig {
      * The reporter to use for logging test results.
      * This should implement the Reporter interface.
      */
-    reporter: Reporter;
+    reporters: Reporter[];
 }
 
 export type Config = Prettify<Partial<StrictConfig>>;

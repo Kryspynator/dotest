@@ -42,7 +42,11 @@ suite("Retry Mechanism")
             });
 
             // 2 retries means 3 attempts total
-            await dotest.run({ reporter, testTimeout: 1000, retries: 2 });
+            await dotest.run({
+                reporters: [reporter],
+                testTimeout: 1000,
+                retries: 2,
+            });
 
             expect(failCount).toBe(3);
             expect(reporter.passed).toBe(1);
@@ -58,12 +62,15 @@ suite("Retry Mechanism")
 
         dotest.test("always failing test", () => {
             failCount++;
-            console.log(`[DEBUG] failCount incremented to ${failCount}`);
             throw new Error("Permanent failure");
         });
 
         // 1 retry means 2 attempts total
-        await dotest.run({ reporter, testTimeout: 1000, retries: 1 });
+        await dotest.run({
+            reporters: [reporter],
+            testTimeout: 1000,
+            retries: 1,
+        });
 
         expect(failCount).toBe(2);
         expect(reporter.passed).toBe(0);

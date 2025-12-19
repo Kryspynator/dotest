@@ -15,7 +15,7 @@ import type {
 export class Dotest {
     rootSuite: Suite<any, any>;
     currentSuite: Suite<any, any>;
-    reporter: Reporter = defaultReporter;
+    reporters: Reporter[] = [defaultReporter];
     testTimeout: number = 5000;
     retries: number = 0;
 
@@ -149,14 +149,18 @@ export class Dotest {
         return expectModule(actual);
     }
 
-    async run({ reporter, testTimeout, retries }: RunArgs) {
-        this.reporter = reporter;
+    async run({ reporters, testTimeout, retries }: RunArgs) {
+        this.reporters = reporters;
         this.testTimeout = testTimeout;
         this.retries = retries;
 
-        this.reporter.startedAll();
+        this.reporters.forEach((reporter) => reporter.startedAll());
+
         await this.executeSuite(this.rootSuite, -1);
-        this.reporter.finishedAll(this.rootSuite.failed, this.rootSuite.passed);
+
+        this.reporters.forEach((reporter) =>
+            reporter.finishedAll(this.rootSuite.failed, this.rootSuite.passed)
+        );
     }
 
     private async executeSuite<BeforeAllData, BeforeEachData>(
@@ -164,7 +168,9 @@ export class Dotest {
         _depth: number
     ) {
         if (_depth >= 0) {
-            this.reporter.startedSuite(suite.name, _depth);
+            this.reporters.forEach((reporter) =>
+                reporter.startedSuite(suite.name, _depth)
+            );
         }
 
         const data = await suite.hooks.beforeAll();
@@ -178,11 +184,13 @@ export class Dotest {
         }
 
         await suite.hooks.afterAll(data);
-        this.reporter.finishedSuite(
-            suite.name,
-            _depth,
-            suite.failed,
-            suite.passed
+        this.reporters.forEach((reporter) =>
+            reporter.finishedSuite(
+                suite.name,
+                _depth,
+                suite.failed,
+                suite.passed
+            )
         );
     }
 
@@ -192,7 +200,9 @@ export class Dotest {
         _depth: number,
         beforeAllData: BeforeAllData
     ) {
-        this.reporter.startedTest(test.name, _depth);
+        this.reporters.forEach((reporter) =>
+            reporter.startedTest(test.name, _depth)
+        );
 
         let attempts = 0;
         const maxAttempts = this.retries + 1;
@@ -232,7 +242,9 @@ export class Dotest {
                             const elapsed = timer.ms();
                             suite.passed++;
                             this.rootSuite.passed++;
-                            this.reporter.passedTest(elapsed, _depth + 1);
+                            this.reporters.forEach((reporter) =>
+                                reporter.passedTest(elapsed, _depth + 1)
+                            );
                             return; // Test passed, exit retry loop
                         } catch (error: any) {
                             clearTimeout(timeoutId);
@@ -257,13 +269,12 @@ export class Dotest {
                 }
             } catch (error: any) {
                 attempts++;
-                console.log(
-                    `[DEBUG] Attempt ${attempts} failed for "${test.name}"`
-                );
                 if (attempts >= maxAttempts) {
                     suite.failed++;
                     this.rootSuite.failed++;
-                    this.reporter.failedTest(error, _depth + 1);
+                    this.reporters.forEach((reporter) =>
+                        reporter.failedTest(error, _depth + 1)
+                    );
                 }
             }
         }
