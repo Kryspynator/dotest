@@ -7,10 +7,15 @@ import type {
     Reporter,
     RunArgs,
     Suite,
-    Test,
+    SubsuiteMember,
     TestCaseFunc,
     TestFunc,
     OptionallyAsync,
+    BeforeAllStage,
+    BeforeEachStage,
+    TestStage,
+    AfterEachStage,
+    AfterAllStage,
 } from "./types.ts";
 
 export class Dotest {
@@ -29,13 +34,12 @@ export class Dotest {
         return {
             name,
             parent,
-            children: [],
-            tests: [],
+            members: [],
             hooks: {
-                beforeAll: () => {},
-                afterAll: () => {},
-                beforeEach: () => {},
-                afterEach: () => {},
+                beforeAll: () => ({}) as any,
+                afterAll: () => Promise.resolve(),
+                beforeEach: () => ({}) as any,
+                afterEach: () => Promise.resolve(),
             },
             failed: 0,
             passed: 0,
@@ -46,7 +50,7 @@ export class Dotest {
         name: string,
         fn: TestFunc<BeforeAllData, BeforeEachData>
     ) {
-        this.currentSuite.tests.push({ name, fn });
+        this.currentSuite.members.push({ type: "test", name, fn });
     }
 
     testEach<BeforeAllData, BeforeEachData, TestCaseData>(
@@ -63,7 +67,7 @@ export class Dotest {
         const suiteName =
             typeof name === "string" ? name : "Parameterized Test";
         const suite = this.createSuite(suiteName, this.currentSuite);
-        this.currentSuite.children.push(suite);
+        this.currentSuite.members.push({ type: "suite", suite });
         this.currentSuite = suite;
 
         for (const testCase of testCases) {
@@ -108,7 +112,7 @@ export class Dotest {
 
         this.reporters.forEach((reporter) => reporter.startedAll());
 
-        await this.executeSuite(this.rootSuite, -1);
+        await this.executeSuite(this.rootSuite, -1, {}, {});
 
         this.reporters.forEach((reporter) =>
             reporter.finishedAll(this.rootSuite.failed, this.rootSuite.passed)
@@ -117,7 +121,9 @@ export class Dotest {
 
     private async executeSuite<BeforeAllData, BeforeEachData>(
         suite: Suite<BeforeAllData, BeforeEachData>,
-        _depth: number
+        _depth: number,
+        accumulatedBeforeAllData: any,
+        accumulatedBeforeEachData: any
     ) {
         if (_depth >= 0) {
             this.reporters.forEach((reporter) =>
@@ -125,17 +131,63 @@ export class Dotest {
             );
         }
 
-        const data = await suite.hooks.beforeAll();
+        const suiteBeforeAllData = (await suite.hooks.beforeAll()) || {};
+        const currentBeforeAllData = {
+            ...accumulatedBeforeAllData,
+            ...suiteBeforeAllData,
+        };
 
-        for (const test of suite.tests) {
-            await this.executeTest(test, suite, _depth + 1, data);
+        for (const member of suite.members) {
+            let suiteBeforeEachData;
+            try {
+                suiteBeforeEachData = (await suite.hooks.beforeEach()) || {};
+                const currentBeforeEachData = {
+                    ...accumulatedBeforeEachData,
+                    ...suiteBeforeEachData,
+                };
+                if (member.type === "test") {
+                    await this.executeTest(
+                        member,
+                        suite,
+                        _depth + 1,
+                        currentBeforeAllData,
+                        currentBeforeEachData
+                    );
+                } else {
+                    if (member.fn) {
+                        const subsuiteBuilder = new SuiteBuilder(
+                            this,
+                            member.suite.name,
+                            suite,
+                            member.suite
+                        );
+
+                        (member as SubsuiteMember<any, any>).fn!(
+                            subsuiteBuilder as any,
+                            currentBeforeAllData,
+                            currentBeforeEachData
+                        );
+                    }
+                    await this.executeSuite(
+                        member.suite,
+                        _depth + 1,
+                        currentBeforeAllData,
+                        currentBeforeEachData
+                    );
+                }
+            } catch (error: any) {
+                // Handle hook failures
+                suite.failed++;
+                this.rootSuite.failed++;
+                this.reporters.forEach((reporter) =>
+                    reporter.failedTest(error, _depth + 1)
+                );
+            } finally {
+                await suite.hooks.afterEach(suiteBeforeEachData as any);
+            }
         }
 
-        for (const child of suite.children) {
-            await this.executeSuite(child, _depth + 1);
-        }
-
-        await suite.hooks.afterAll(data);
+        await suite.hooks.afterAll(suiteBeforeAllData as any);
         this.reporters.forEach((reporter) =>
             reporter.finishedSuite(
                 suite.name,
@@ -147,10 +199,11 @@ export class Dotest {
     }
 
     private async executeTest<BeforeAllData, BeforeEachData>(
-        test: Test<BeforeAllData, BeforeEachData>,
+        test: { name: string; fn: TestFunc<BeforeAllData, BeforeEachData> },
         suite: Suite<BeforeAllData, BeforeEachData>,
         _depth: number,
-        beforeAllData: BeforeAllData
+        beforeAllData: BeforeAllData,
+        beforeEachData: BeforeEachData
     ) {
         this.reporters.forEach((reporter) =>
             reporter.startedTest(test.name, _depth)
@@ -160,63 +213,43 @@ export class Dotest {
         const maxAttempts = this.retries + 1;
 
         while (attempts < maxAttempts) {
-            let data: BeforeEachData | undefined;
             try {
-                try {
-                    data = await suite.hooks.beforeEach();
-                    try {
-                        let done = false;
-                        const timer = new Timer();
-                        let timeoutId:
-                            | ReturnType<typeof setTimeout>
-                            | undefined;
-                        const timeout = new Promise((_, reject) => {
-                            timeoutId = setTimeout(() => {
-                                if (!done) {
-                                    reject(
-                                        new Error(
-                                            `Test "${test.name}" timed out after ${this.testTimeout}ms`
-                                        )
-                                    );
-                                }
-                            }, this.testTimeout);
-                        });
-                        try {
-                            timer.start();
-                            await Promise.race([
-                                test.fn(beforeAllData, data),
-                                timeout,
-                            ]);
-                            done = true;
-                            clearTimeout(timeoutId);
-
-                            timer.stop();
-                            const elapsed = timer.ms();
-                            suite.passed++;
-                            this.rootSuite.passed++;
-                            this.reporters.forEach((reporter) =>
-                                reporter.passedTest(elapsed, _depth + 1)
+                let done = false;
+                const timer = new Timer();
+                let timeoutId: ReturnType<typeof setTimeout> | undefined;
+                const timeout = new Promise((_, reject) => {
+                    timeoutId = setTimeout(() => {
+                        if (!done) {
+                            reject(
+                                new Error(
+                                    `Test "${test.name}" timed out after ${this.testTimeout}ms`
+                                )
                             );
-                            return; // Test passed, exit retry loop
-                        } catch (error: any) {
-                            clearTimeout(timeoutId);
-                            timer.stop();
-                            error.message = `${error.message}`;
-                            error.wasThrown = true;
-                            throw error;
-                        } finally {
-                            await suite.hooks.afterEach(data);
                         }
-                    } catch (error: any) {
-                        if (error.wasThrown) throw error;
-                        error.wasThrown = true;
-                        error.message = `Error in after each for "${test.name}": ${error.message}`;
-                        throw error;
-                    }
+                    }, this.testTimeout);
+                });
+                try {
+                    timer.start();
+                    await Promise.race([
+                        test.fn(beforeAllData, beforeEachData),
+                        timeout,
+                    ]);
+                    done = true;
+                    clearTimeout(timeoutId);
+
+                    timer.stop();
+                    const elapsed = timer.ms();
+                    suite.passed++;
+                    this.rootSuite.passed++;
+                    this.reporters.forEach((reporter) =>
+                        reporter.passedTest(elapsed, _depth + 1)
+                    );
+                    return; // Test passed, exit retry loop
                 } catch (error: any) {
-                    if (error.wasThrown) throw error;
+                    clearTimeout(timeoutId);
+                    timer.stop();
+                    error.message = `${error.message}`;
                     error.wasThrown = true;
-                    error.message = `Error in before each for "${test.name}": ${error.message}`;
                     throw error;
                 }
             } catch (error: any) {
@@ -231,13 +264,13 @@ export class Dotest {
             }
         }
     }
-    suite(name: string) {
-        return new SuiteBuilder(this, name);
+    suite(name: string): BeforeAllStage<unknown, unknown> {
+        return new SuiteBuilder(this, name) as any;
     }
 
     enterSuite(name: string) {
         const suite = this.createSuite(name, this.currentSuite);
-        this.currentSuite.children.push(suite);
+        this.currentSuite.members.push({ type: "suite", suite });
         this.currentSuite = suite;
     }
 
@@ -248,7 +281,14 @@ export class Dotest {
     }
 }
 
-export class SuiteBuilder<BeforeAllData = unknown, BeforeEachData = unknown> {
+export class SuiteBuilder<BeforeAllData = unknown, BeforeEachData = unknown>
+    implements
+        BeforeAllStage<BeforeAllData, BeforeEachData>,
+        BeforeEachStage<BeforeAllData, BeforeEachData>,
+        TestStage<BeforeAllData, BeforeEachData>,
+        AfterEachStage<BeforeAllData, BeforeEachData>,
+        AfterAllStage<BeforeAllData, BeforeEachData>
+{
     private beforeAllFn: BeforeFunc<any> = () => {};
     private beforeEachFn: BeforeFunc<any> = () => {};
     private afterAllFn: AfterFunc<any> = () => {};
@@ -257,94 +297,115 @@ export class SuiteBuilder<BeforeAllData = unknown, BeforeEachData = unknown> {
     private dotest: Dotest;
     private suite: Suite<any, any>;
 
-    constructor(dotest: Dotest, name: string, parentSuite?: Suite<any, any>) {
+    constructor(
+        dotest: Dotest,
+        name: string,
+        parentSuite?: Suite<any, any>,
+        existingSuite?: Suite<any, any>
+    ) {
         this.dotest = dotest;
-        const parent = parentSuite || this.dotest.currentSuite;
-        this.suite = this.dotest.createSuite(name, parent);
-        parent.children.push(this.suite);
+        if (existingSuite) {
+            this.suite = existingSuite;
+        } else {
+            const parent = parentSuite || this.dotest.currentSuite;
+            this.suite = this.dotest.createSuite(name, parent);
+            if (parent) {
+                parent.members.push({ type: "suite", suite: this.suite });
+            }
+        }
     }
 
     beforeAll<T>(
         fn: () => OptionallyAsync<T>
-    ): SuiteBuilder<BeforeAllData & T, BeforeEachData> {
-        const prev = this.beforeAllFn;
-        this.beforeAllFn = async () => {
+    ): BeforeAllStage<BeforeAllData & T, BeforeEachData> {
+        const prev = this.suite.hooks.beforeAll;
+        this.suite.hooks.beforeAll = async () => {
             const prevData = (await prev()) || {};
             const newData = (await fn()) || {};
             return { ...prevData, ...newData };
         };
-        this.suite.hooks.beforeAll = this.beforeAllFn;
-        return this as any;
+        return this as unknown as BeforeAllStage<
+            BeforeAllData & T,
+            BeforeEachData
+        >;
     }
 
     beforeEach<T>(
         fn: () => OptionallyAsync<T>
-    ): SuiteBuilder<BeforeAllData, BeforeEachData & T> {
-        const prev = this.beforeEachFn;
-        this.beforeEachFn = async () => {
+    ): BeforeEachStage<BeforeAllData, BeforeEachData & T> {
+        const prev = this.suite.hooks.beforeEach;
+        this.suite.hooks.beforeEach = async () => {
             const prevData = (await prev()) || {};
             const newData = (await fn()) || {};
             return { ...prevData, ...newData };
         };
-        this.suite.hooks.beforeEach = this.beforeEachFn;
+        return this as unknown as BeforeEachStage<
+            BeforeAllData,
+            BeforeEachData & T
+        >;
+    }
+
+    afterAll(
+        fn: (data: BeforeAllData) => OptionallyAsync<void>
+    ): AfterAllStage<BeforeAllData, BeforeEachData> {
+        const prev = this.suite.hooks.afterAll;
+        this.suite.hooks.afterAll = async (data) => {
+            await prev(data);
+            await fn(data);
+        };
         return this as any;
     }
 
-    afterAll(fn: (data: BeforeAllData) => OptionallyAsync<void>): this {
-        const prev = this.afterAllFn;
-        this.afterAllFn = async (data) => {
+    afterEach(
+        fn: (data: BeforeEachData) => OptionallyAsync<void>
+    ): AfterEachStage<BeforeAllData, BeforeEachData> {
+        const prev = this.suite.hooks.afterEach;
+        this.suite.hooks.afterEach = async (data) => {
             await prev(data);
             await fn(data);
         };
-        this.suite.hooks.afterAll = this.afterAllFn;
-        return this;
+        return this as any;
     }
 
-    afterEach(fn: (data: BeforeEachData) => OptionallyAsync<void>): this {
-        const prev = this.afterEachFn;
-        this.afterEachFn = async (data) => {
-            await prev(data);
-            await fn(data);
-        };
-        this.suite.hooks.afterEach = this.afterEachFn;
-        return this;
-    }
-
-    test(name: string, fn: TestFunc<BeforeAllData, BeforeEachData>) {
-        this.suite.tests.push({ name, fn });
-        return this;
+    test(
+        name: string,
+        fn: TestFunc<BeforeAllData, BeforeEachData>
+    ): TestStage<BeforeAllData, BeforeEachData> {
+        this.suite.members.push({ type: "test", name, fn });
+        return this as any;
     }
 
     subsuite(
         name: string,
-        fn: (subsuite: SuiteBuilder<BeforeAllData, BeforeEachData>) => void
-    ): this {
-        const subsuiteBuilder = new SuiteBuilder<BeforeAllData, BeforeEachData>(
-            this.dotest,
-            name,
-            this.suite
-        );
+        fn: (
+            subsuite: BeforeAllStage<BeforeAllData, BeforeEachData>,
+            beforeAll: BeforeAllData,
+            beforeEach: BeforeEachData
+        ) => void
+    ): TestStage<BeforeAllData, BeforeEachData> {
+        if (fn.length > 1) {
+            const subsuite = this.dotest.createSuite(name, this.suite);
+            this.suite.members.push({
+                type: "suite",
+                suite: subsuite,
+                fn: fn as any,
+            });
+        } else {
+            const subsuiteBuilder = new SuiteBuilder<
+                BeforeAllData,
+                BeforeEachData
+            >(this.dotest, name, this.suite);
 
-        // Inherit hooks from parent
-        subsuiteBuilder.beforeAllFn = this.beforeAllFn;
-        subsuiteBuilder.beforeEachFn = this.beforeEachFn;
-        subsuiteBuilder.afterAllFn = this.afterAllFn;
-        subsuiteBuilder.afterEachFn = this.afterEachFn;
-
-        subsuiteBuilder.suite.hooks.beforeAll = this.beforeAllFn;
-        subsuiteBuilder.suite.hooks.beforeEach = this.beforeEachFn;
-        subsuiteBuilder.suite.hooks.afterAll = this.afterAllFn;
-        subsuiteBuilder.suite.hooks.afterEach = this.afterEachFn;
-
-        fn(subsuiteBuilder);
-        return this;
+            fn(subsuiteBuilder, undefined as any, undefined as any);
+        }
+        return this as unknown as TestStage<BeforeAllData, BeforeEachData>;
     }
 
     testEach<TestCaseData>(
         name: string | ((data: TestCaseData) => string),
         testCases: TestCaseData[],
         fn: TestCaseFunc<BeforeAllData, BeforeEachData, TestCaseData>
-    ) {
+    ): TestStage<BeforeAllData, BeforeEachData> {
         if (!Array.isArray(testCases) || testCases.length === 0) {
             throw new Error(
                 "test.each requires a non-empty array of test cases"
@@ -354,12 +415,12 @@ export class SuiteBuilder<BeforeAllData = unknown, BeforeEachData = unknown> {
         const suiteName =
             typeof name === "string" ? name : "Parameterized Test";
         const suite = this.dotest.createSuite(suiteName, this.suite);
-        this.suite.children.push(suite);
+        this.suite.members.push({ type: "suite", suite });
 
-        suite.hooks.beforeAll = this.beforeAllFn;
-        suite.hooks.afterAll = this.afterAllFn;
-        suite.hooks.beforeEach = this.beforeEachFn;
-        suite.hooks.afterEach = this.afterEachFn;
+        suite.hooks.beforeAll = this.suite.hooks.beforeAll;
+        suite.hooks.afterAll = this.suite.hooks.afterAll;
+        suite.hooks.beforeEach = this.suite.hooks.beforeEach;
+        suite.hooks.afterEach = this.suite.hooks.afterEach;
 
         for (const testCase of testCases) {
             const testName =
@@ -367,12 +428,13 @@ export class SuiteBuilder<BeforeAllData = unknown, BeforeEachData = unknown> {
                     ? name(testCase)
                     : `${name} - ${JSON.stringify(testCase)}`;
 
-            suite.tests.push({
+            suite.members.push({
+                type: "test",
                 name: testName,
                 fn: (beforeAll: BeforeAllData, beforeEach: BeforeEachData) =>
                     fn(testCase, beforeAll, beforeEach),
             });
         }
-        return this;
+        return this as any;
     }
 }

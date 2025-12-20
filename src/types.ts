@@ -90,12 +90,87 @@ export interface Hooks<BeforeAllData, BeforeEachData> {
 
 export type HookVariants = Prettify<keyof Hooks<any, any>>;
 
+export interface TestMember<BeforeAllData, BeforeEachData> {
+    type: "test";
+    name: string;
+    fn: TestFunc<BeforeAllData, BeforeEachData>;
+}
+
+export interface SubsuiteMember<BeforeAllData, BeforeEachData> {
+    type: "suite";
+    suite: Suite<any, any>;
+    fn?: (
+        subsuite: BeforeAllStage<BeforeAllData, BeforeEachData>,
+        beforeAllData: BeforeAllData,
+        beforeEachData: BeforeEachData
+    ) => void;
+}
+
+export type SuiteMember<BeforeAllData, BeforeEachData> =
+    | TestMember<BeforeAllData, BeforeEachData>
+    | SubsuiteMember<BeforeAllData, BeforeEachData>;
+
 export interface Suite<BeforeAllData, BeforeEachData> {
     name: string;
     parent: Suite<any, any> | null;
-    children: Suite<any, any>[];
-    tests: Test<BeforeAllData, BeforeEachData>[];
+    members: SuiteMember<BeforeAllData, BeforeEachData>[];
     hooks: Hooks<BeforeAllData, BeforeEachData>;
     failed: number;
     passed: number;
+}
+
+export interface BeforeAllStage<
+    BeforeAllData,
+    BeforeEachData,
+> extends BeforeEachStage<BeforeAllData, BeforeEachData> {
+    beforeAll<T>(
+        fn: () => OptionallyAsync<T>
+    ): BeforeAllStage<BeforeAllData & T, BeforeEachData>;
+}
+
+export interface BeforeEachStage<
+    BeforeAllData,
+    BeforeEachData,
+> extends TestStage<BeforeAllData, BeforeEachData> {
+    beforeEach<T>(
+        fn: () => OptionallyAsync<T>
+    ): BeforeEachStage<BeforeAllData, BeforeEachData & T>;
+}
+
+export interface TestStage<
+    BeforeAllData,
+    BeforeEachData,
+> extends AfterEachStage<BeforeAllData, BeforeEachData> {
+    test(
+        name: string,
+        fn: TestFunc<BeforeAllData, BeforeEachData>
+    ): TestStage<BeforeAllData, BeforeEachData>;
+    testEach<TestCaseData>(
+        name: string | ((data: TestCaseData) => string),
+        testCases: TestCaseData[],
+        fn: TestCaseFunc<BeforeAllData, BeforeEachData, TestCaseData>
+    ): TestStage<BeforeAllData, BeforeEachData>;
+    subsuite(
+        name: string,
+        fn: (
+            subsuite: BeforeAllStage<BeforeAllData, BeforeEachData>,
+            beforeAll: BeforeAllData,
+            beforeEach: BeforeEachData
+        ) => void
+    ): TestStage<BeforeAllData, BeforeEachData>;
+}
+
+export interface AfterEachStage<
+    BeforeAllData,
+    BeforeEachData,
+> extends AfterAllStage<BeforeAllData, BeforeEachData> {
+    afterEach(
+        fn: (data: BeforeEachData) => OptionallyAsync<void>
+    ): AfterEachStage<BeforeAllData, BeforeEachData>;
+}
+
+export interface AfterAllStage<BeforeAllData, BeforeEachData> {
+    afterAll(
+        fn: (data: BeforeAllData) => OptionallyAsync<void>
+    ): AfterAllStage<BeforeAllData, BeforeEachData>;
 }
